@@ -5,24 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AI同時通訳</title>
+  <title>AIリアルタイム字幕通訳</title>
   <style>
     :root { --bg: #0f172a; --card: #1e293b; --accent: #3b82f6; --danger: #ef4444; --text: #f8fafc; }
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; background: var(--bg); color: var(--text); display: flex; flex-direction: column; height: 100dvh; padding: 16px; }
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    h1 { font-size: 1.1rem; margin: 0; font-weight: 700; }
-    .settings-btn { background: var(--card); border: 1px solid #334155; color: var(--text); padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; }
-    .lang-bar { display: flex; gap: 8px; align-items: center; background: var(--card); padding: 10px; border-radius: 12px; margin-bottom: 12px; }
+    body { margin: 0; background: var(--bg); color: var(--text); display: flex; flex-direction: column; height: 100dvh; padding: 14px; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    h1 { font-size: 1.05rem; margin: 0; font-weight: 700; }
+    .header-btns { display: flex; gap: 6px; }
+    .icon-btn { background: var(--card); border: 1px solid #334155; color: var(--text); padding: 6px 10px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; }
+    .lang-bar { display: flex; gap: 8px; align-items: center; background: var(--card); padding: 8px; border-radius: 12px; margin-bottom: 10px; }
     select { flex: 1; background: #0f172a; color: var(--text); border: 1px solid #334155; padding: 10px; border-radius: 8px; font-size: 1rem; font-weight: 600; }
-    .swap-btn { background: #0f172a; border: 1px solid #334155; color: var(--text); font-size: 1.2rem; padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: transform 0.2s, background 0.2s; }
+    .swap-btn { background: #0f172a; border: 1px solid #334155; color: var(--text); font-size: 1.2rem; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
     .swap-btn:active { transform: scale(0.92); background: #334155; }
-    .log-box { flex: 1; background: var(--card); border-radius: 14px; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; border: 1px solid #334155; }
-    .status { font-size: 0.85rem; color: #94a3b8; text-align: center; padding: 6px; word-break: break-all; }
-    .transcript { font-size: 1.15rem; line-height: 1.5; background: #0f172a; padding: 12px; border-radius: 10px; border-left: 4px solid var(--accent); }
-    .main-btn { width: 100%; padding: 20px; border-radius: 16px; border: none; font-size: 1.2rem; font-weight: 700; color: white; background: var(--accent); cursor: pointer; transition: 0.2s; box-shadow: 0 4px 14px rgba(59,130,246,0.4); }
-    .main-btn.active { background: var(--danger); box-shadow: 0 4px 14px rgba(239,68,68,0.4); animation: pulse 1.8s infinite; }
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.85; } 100% { opacity: 1; } }
+    .log-box { flex: 1; background: var(--card); border-radius: 14px; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; border: 1px solid #334155; scroll-behavior: smooth; }
+    .status { font-size: 0.85rem; color: #94a3b8; text-align: center; padding: 4px; }
+    .transcript { font-size: 1.3rem; font-weight: 500; line-height: 1.55; background: #0f172a; padding: 14px 16px; border-radius: 12px; border-left: 5px solid var(--accent); letter-spacing: 0.02em; }
+    .main-btn { width: 100%; padding: 18px; border-radius: 16px; border: none; font-size: 1.15rem; font-weight: 700; color: white; background: var(--accent); cursor: pointer; transition: 0.2s; box-shadow: 0 4px 14px rgba(59,130,246,0.4); }
+    .main-btn.active { background: var(--danger); box-shadow: 0 4px 14px rgba(239,68,68,0.4); }
     #apiModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; padding: 20px; z-index: 50; }
     .modal-card { background: var(--card); padding: 20px; border-radius: 16px; width: 100%; max-width: 400px; }
     .modal-card input { width: 100%; padding: 12px; margin: 12px 0; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; }
@@ -31,8 +31,11 @@
 <body>
 
 <header>
-  <h1>🎙️ Gemini リアルタイム同時通訳</h1>
-  <button class="settings-btn" onclick="openModal()">⚙️ APIキー</button>
+  <h1>💬 リアルタイム字幕通訳</h1>
+  <div class="header-btns">
+    <button class="icon-btn" onclick="clearLogs()">🗑️ クリア</button>
+    <button class="icon-btn" onclick="openModal()">⚙️ キー</button>
+  </div>
 </header>
 
 <div class="lang-bar">
@@ -58,7 +61,7 @@
 </div>
 
 <div class="log-box" id="logBox">
-  <div class="status" id="statusText">「通訳開始」を押して話しかけてください</div>
+  <div class="status" id="statusText">「通訳開始」を押すと文字でリアルタイム翻訳されます</div>
 </div>
 
 <button class="main-btn" id="toggleBtn" onclick="toggleSession()">通訳開始</button>
@@ -78,7 +81,6 @@
   let micStream = null;
   let processor = null;
   let isRunning = false;
-  let nextPlayTime = 0;
 
   const MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025";
 
@@ -97,6 +99,13 @@
       localStorage.setItem("gemini_api_key", key);
       document.getElementById("apiModal").style.display = "none";
     }
+  }
+
+  function clearLogs() {
+    const box = document.getElementById("logBox");
+    const status = document.getElementById("statusText");
+    box.innerHTML = "";
+    box.appendChild(status);
   }
 
   async function swapLanguages() {
@@ -120,6 +129,7 @@
   }
 
   function appendTranscript(text) {
+    if (!text) return;
     const box = document.getElementById("logBox");
     let last = box.lastElementChild;
     if (!last || !last.classList.contains("transcript") || last.dataset.done === "true") {
@@ -151,9 +161,10 @@
       setStatus("接続中...");
       audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
       if (audioCtx.state === "suspended") await audioCtx.resume();
-      nextPlayTime = audioCtx.currentTime;
 
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
 
       const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
       ws = new WebSocket(url);
@@ -163,12 +174,11 @@
           setup: {
             model: MODEL,
             generationConfig: {
-              responseModalities: ["AUDIO"],
-              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } }
+              responseModalities: ["TEXT"]
             },
             systemInstruction: {
               parts: [{
-                text: `あなたはプロの同時通訳者です。ユーザーの話す言語を聞き取り、${langA}なら${langB}へ、${langB}なら${langA}へ即座に翻訳して発話してください。返事・相槌・解説は一切禁止です。翻訳結果のみを自然な口調で出力してください。`
+                text: `あなたは超高速な同時通訳字幕システムです。聞こえた音声をリアルタイムで翻訳し、${langA}なら${langB}のテキスト、${langB}なら${langA}のテキストのみを即座に出力してください。返事・相槌・解説・括弧書きは一切禁止です。文の終わりを待たず、聞こえたそばから自然な訳文を出力してください。`
               }]
             }
           }
@@ -178,7 +188,7 @@
         isRunning = true;
         btn.textContent = "通訳を停止";
         btn.classList.add("active");
-        setStatus(`通訳中（${langA} ⇄ ${langB}）`);
+        setStatus(`🟢 リアルタイム字幕中（${langA} ⇄ ${langB}）`);
       };
 
       ws.onmessage = async (event) => {
@@ -187,9 +197,6 @@
 
         if (data.serverContent?.modelTurn?.parts) {
           for (const part of data.serverContent.modelTurn.parts) {
-            if (part.inlineData && part.inlineData.mimeType.startsWith("audio/pcm")) {
-              playPcmAudio(part.inlineData.data);
-            }
             if (part.text) {
               appendTranscript(part.text);
             }
@@ -221,7 +228,8 @@
 
   function startMicStreaming() {
     const source = audioCtx.createMediaStreamSource(micStream);
-    processor = audioCtx.createScriptProcessor(4096, 1, 1);
+    // バッファサイズを1024に小さくして超低遅延で音声を送信
+    processor = audioCtx.createScriptProcessor(1024, 1, 1);
 
     processor.onaudioprocess = (e) => {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -241,26 +249,6 @@
 
     source.connect(processor);
     processor.connect(audioCtx.destination);
-  }
-
-  function playPcmAudio(base64) {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const pcm16 = new Int16Array(bytes.buffer);
-    const float32 = new Float32Array(pcm16.length);
-    for (let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768;
-
-    const buffer = audioCtx.createBuffer(1, float32.length, 24000);
-    buffer.getChannelData(0).set(float32);
-
-    const src = audioCtx.createBufferSource();
-    src.buffer = buffer;
-    src.connect(audioCtx.destination);
-
-    const startTime = Math.max(audioCtx.currentTime, nextPlayTime);
-    src.start(startTime);
-    nextPlayTime = startTime + buffer.duration;
   }
 
   function stopSession(reasonMsg) {
