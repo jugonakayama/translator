@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AIリアルタイム字幕通訳</title>
+  <title>AIリアルタイム字幕通訳 v3.0</title>
   <style>
     :root { --bg: #0f172a; --card: #1e293b; --accent: #3b82f6; --danger: #ef4444; --text: #f8fafc; }
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -21,7 +21,7 @@
     .log-box { flex: 1; background: var(--card); border-radius: 14px; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; border: 1px solid #334155; scroll-behavior: smooth; }
     .status { font-size: 0.85rem; color: #94a3b8; text-align: center; padding: 4px; word-break: break-all; }
     .transcript { font-size: 1.3rem; font-weight: 500; line-height: 1.55; background: #0f172a; padding: 14px 16px; border-radius: 12px; border-left: 5px solid var(--accent); letter-spacing: 0.02em; }
-    .main-btn { width: 100%; padding: 18px; border-radius: 16px; border: none; font-size: 1.15rem; font-weight: 700; color: white; background: var(--accent); cursor: pointer; transition: 0.2s; box-shadow: 0 4px 14px rgba(59,130,246,0.4); }
+    .main-btn { width: 100%; padding: 18px; border-radius: 16px; border: none; font-size: 1.15rem; font-weight: 700; color: white; background: var(--accent); cursor: pointer; transition: 0.2s; box-shadow: 0 4px 14px rgba(59,130,246,0.4); -webkit-tap-highlight-color: transparent; }
     .main-btn.active { background: var(--danger); box-shadow: 0 4px 14px rgba(239,68,68,0.4); }
     #apiModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; padding: 20px; z-index: 50; }
     .modal-card { background: var(--card); padding: 20px; border-radius: 16px; width: 100%; max-width: 400px; }
@@ -31,7 +31,7 @@
 <body>
 
 <header>
-  <h1>💬 リアルタイム字幕通訳</h1>
+  <h1>💬 リアルタイム字幕通訳 v3.0</h1>
   <div class="header-btns">
     <button class="icon-btn" onclick="clearLogs()">🗑️ クリア</button>
     <button class="icon-btn" onclick="openModal()">⚙️ キー</button>
@@ -98,6 +98,7 @@
     if (key) {
       localStorage.setItem("gemini_api_key", key);
       document.getElementById("apiModal").style.display = "none";
+      setStatus("APIキーを保存しました。「通訳開始」を押してください");
     }
   }
 
@@ -150,20 +151,25 @@
   }
 
   async function startSession() {
+    setStatus("⏳ マイクとサーバーに接続中...");
     const apiKey = localStorage.getItem("gemini_api_key");
-    if (!apiKey) return openModal();
+    if (!apiKey) {
+      setStatus("APIキーが未設定です");
+      return openModal();
+    }
 
     const langA = document.getElementById("langA").value;
     const langB = document.getElementById("langB").value;
     const btn = document.getElementById("toggleBtn");
 
     try {
-      setStatus("接続中...");
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      // iPhone Safariの標準レートに任せて初期化（強制16000Hz指定のエラーを回避）
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContextClass();
       if (audioCtx.state === "suspended") await audioCtx.resume();
 
       micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
       });
 
       const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
@@ -196,7 +202,6 @@
         const raw = event.data instanceof Blob ? await event.data.text() : event.data;
         const data = JSON.parse(raw);
 
-        // 音声は再生せず、リアルタイム文字起こし（字幕）のみを表示
         if (data.serverContent?.outputTranscription?.text) {
           appendTranscript(data.serverContent.outputTranscription.text);
         }
@@ -217,25 +222,60 @@
       };
 
     } catch (err) {
-      stopSession("エラー: " + err.message);
+      stopSession("起動エラー: " + err.message);
     }
   }
 
   function startMicStreaming() {
     const source = audioCtx.createMediaStreamSource(micStream);
-    processor = audioCtx.createScriptProcessor(1024, 1, 1);
+    processor = audioCtx.createScriptProcessor(2048, 1, 1);
+    const inputSampleRate = audioCtx.sampleRate;
+    const targetSampleRate = 16000;
 
     processor.onaudioprocess = (e) => {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       const floatData = e.inputBuffer.getChannelData(0);
-      const pcm16 = new Int16Array(floatData.length);
-      for (let i = 0; i < floatData.length; i++) {
-        const s = Math.max(-1, Math.min(1, floatData[i]));
+      
+      // iPhoneの48000Hz音声を16000Hzへ綺麗にダウンサンプリング
+      const ratio = inputSampleRate / targetSampleRate;
+      const newLength = Math.round(floatData.length / ratio);
+      const pcm16 = new Int16Array(newLength);
+      for (let i = 0; i < newLength; i++) {
+        const idx = Math.min(floatData.length - 1, Math.round(i * ratio));
+        const s = Math.max(-1, Math.min(1, floatData[idx]));
         pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
       }
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)));
+
+      const bytes = new Uint8Array(pcm16.buffer);
+      let binary = "";
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+
       ws.send(JSON.stringify({
         realtimeInput: {
           audio: { mimeType: "audio/pcm;rate=16000", data: base64 }
         }
       }));
+    };
+
+    source.connect(processor);
+    processor.connect(audioCtx.destination);
+  }
+
+  function stopSession(reasonMsg) {
+    isRunning = false;
+    if (processor) { processor.disconnect(); processor = null; }
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    if (ws) { ws.close(); ws = null; }
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+
+    const btn = document.getElementById("toggleBtn");
+    btn.textContent = "通訳開始";
+    btn.classList.remove("active");
+    if (reasonMsg) setStatus(reasonMsg);
+  }
+</script>
+</body>
+</html>
