@@ -15,7 +15,8 @@
     .settings-btn { background: var(--card); border: 1px solid #334155; color: var(--text); padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; }
     .lang-bar { display: flex; gap: 8px; align-items: center; background: var(--card); padding: 10px; border-radius: 12px; margin-bottom: 12px; }
     select { flex: 1; background: #0f172a; color: var(--text); border: 1px solid #334155; padding: 10px; border-radius: 8px; font-size: 1rem; font-weight: 600; }
-    .swap { font-size: 1.2rem; color: #94a3b8; }
+    .swap-btn { background: #0f172a; border: 1px solid #334155; color: var(--text); font-size: 1.2rem; padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: transform 0.2s, background 0.2s; }
+    .swap-btn:active { transform: scale(0.92); background: #334155; }
     .log-box { flex: 1; background: var(--card); border-radius: 14px; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; border: 1px solid #334155; }
     .status { font-size: 0.85rem; color: #94a3b8; text-align: center; padding: 6px; word-break: break-all; }
     .transcript { font-size: 1.15rem; line-height: 1.5; background: #0f172a; padding: 12px; border-radius: 10px; border-left: 4px solid var(--accent); }
@@ -35,7 +36,7 @@
 </header>
 
 <div class="lang-bar">
-  <select id="langA">
+  <select id="langA" onchange="onLangChange()">
     <option value="日本語" selected>🇯🇵 日本語</option>
     <option value="英語">🇺🇸 英語</option>
     <option value="中国語">🇨🇳 中国語</option>
@@ -44,8 +45,8 @@
     <option value="フランス語">🇫🇷 フランス語</option>
     <option value="ドイツ語">🇩🇪 ドイツ語</option>
   </select>
-  <span class="swap">⇄</span>
-  <select id="langB">
+  <button class="swap-btn" onclick="swapLanguages()" title="言語を入れ替え">⇄</button>
+  <select id="langB" onchange="onLangChange()">
     <option value="英語" selected>🇺🇸 英語</option>
     <option value="日本語">🇯🇵 日本語</option>
     <option value="中国語">🇨🇳 中国語</option>
@@ -95,6 +96,22 @@
     if (key) {
       localStorage.setItem("gemini_api_key", key);
       document.getElementById("apiModal").style.display = "none";
+    }
+  }
+
+  async function swapLanguages() {
+    const selA = document.getElementById("langA");
+    const selB = document.getElementById("langB");
+    const temp = selA.value;
+    selA.value = selB.value;
+    selB.value = temp;
+    await onLangChange();
+  }
+
+  async function onLangChange() {
+    if (isRunning) {
+      stopSession();
+      await startSession();
     }
   }
 
