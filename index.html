@@ -17,7 +17,7 @@
     select { flex: 1; background: #0f172a; color: var(--text); border: 1px solid #334155; padding: 10px; border-radius: 8px; font-size: 1rem; font-weight: 600; }
     .swap { font-size: 1.2rem; color: #94a3b8; }
     .log-box { flex: 1; background: var(--card); border-radius: 14px; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; border: 1px solid #334155; }
-    .status { font-size: 0.85rem; color: #94a3b8; text-align: center; padding: 6px; }
+    .status { font-size: 0.85rem; color: #94a3b8; text-align: center; padding: 6px; word-break: break-all; }
     .transcript { font-size: 1.15rem; line-height: 1.5; background: #0f172a; padding: 12px; border-radius: 10px; border-left: 4px solid var(--accent); }
     .main-btn { width: 100%; padding: 20px; border-radius: 16px; border: none; font-size: 1.2rem; font-weight: 700; color: white; background: var(--accent); cursor: pointer; transition: 0.2s; box-shadow: 0 4px 14px rgba(59,130,246,0.4); }
     .main-btn.active { background: var(--danger); box-shadow: 0 4px 14px rgba(239,68,68,0.4); animation: pulse 1.8s infinite; }
@@ -66,7 +66,7 @@
   <div class="modal-card">
     <h3 style="margin-top:0">Gemini APIキー設定</h3>
     <p style="font-size:0.85rem; color:#cbd5e1;">キーはこのスマホのブラウザ内にのみ保存されます。</p>
-    <input type="password" id="apiKeyInput" placeholder="AIzaSy..." />
+    <input type="password" id="apiKeyInput" placeholder="APIキーを貼り付け..." />
     <button class="main-btn" style="padding:12px; font-size:1rem;" onclick="saveKey()">保存する</button>
   </div>
 </div>
@@ -79,7 +79,7 @@
   let isRunning = false;
   let nextPlayTime = 0;
 
-  const MODEL = "models/gemini-2.0-flash-exp";
+  const MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025";
 
   window.onload = () => {
     if (!localStorage.getItem("gemini_api_key")) openModal();
@@ -116,7 +116,7 @@
 
   async function toggleSession() {
     if (isRunning) {
-      stopSession();
+      stopSession("停止中（「通訳開始」で再開）");
     } else {
       await startSession();
     }
@@ -133,11 +133,12 @@
     try {
       setStatus("接続中...");
       audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      if (audioCtx.state === "suspended") await audioCtx.resume();
       nextPlayTime = audioCtx.currentTime;
 
       micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
 
-      const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+      const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
       ws = new WebSocket(url);
 
       ws.onopen = () => {
@@ -177,6 +178,9 @@
             }
           }
         }
+        if (data.serverContent?.outputTranscription?.text) {
+          appendTranscript(data.serverContent.outputTranscription.text);
+        }
         if (data.serverContent?.turnComplete) {
           const last = document.getElementById("logBox").lastElementChild;
           if (last && last.classList.contains("transcript")) last.dataset.done = "true";
@@ -184,17 +188,17 @@
       };
 
       ws.onerror = () => {
-        setStatus("通信エラーが発生しました（APIキーまたは制限を確認）");
-        stopSession();
+        stopSession("通信エラーが発生しました（APIキーを確認してください）");
       };
 
-      ws.onclose = () => {
-        if (isRunning) stopSession();
+      ws.onclose = (e) => {
+        if (isRunning) {
+          stopSession(`切断されました (コード:${e.code} ${e.reason || ""})`);
+        }
       };
 
     } catch (err) {
-      setStatus("マイクの許可が必要です: " + err.message);
-      stopSession();
+      stopSession("エラー: " + err.message);
     }
   }
 
@@ -213,7 +217,7 @@
       const base64 = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)));
       ws.send(JSON.stringify({
         realtimeInput: {
-          mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: base64 }]
+          audio: { mimeType: "audio/pcm;rate=16000", data: base64 }
         }
       }));
     };
@@ -242,7 +246,7 @@
     nextPlayTime = startTime + buffer.duration;
   }
 
-  function stopSession() {
+  function stopSession(reasonMsg) {
     isRunning = false;
     if (processor) { processor.disconnect(); processor = null; }
     if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
@@ -252,7 +256,7 @@
     const btn = document.getElementById("toggleBtn");
     btn.textContent = "通訳開始";
     btn.classList.remove("active");
-    setStatus("停止中（「通訳開始」で再開）");
+    if (reasonMsg) setStatus(reasonMsg);
   }
 </script>
 </body>
