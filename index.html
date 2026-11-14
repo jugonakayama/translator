@@ -19,7 +19,7 @@
     .swap-btn { background: #0f172a; border: 1px solid #334155; color: var(--text); font-size: 1.2rem; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
     .swap-btn:active { transform: scale(0.92); background: #334155; }
     .log-box { flex: 1; background: var(--card); border-radius: 14px; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; border: 1px solid #334155; scroll-behavior: smooth; }
-    .status { font-size: 0.85rem; color: #94a3b8; text-align: center; padding: 4px; }
+    .status { font-size: 0.85rem; color: #94a3b8; text-align: center; padding: 4px; word-break: break-all; }
     .transcript { font-size: 1.3rem; font-weight: 500; line-height: 1.55; background: #0f172a; padding: 14px 16px; border-radius: 12px; border-left: 5px solid var(--accent); letter-spacing: 0.02em; }
     .main-btn { width: 100%; padding: 18px; border-radius: 16px; border: none; font-size: 1.15rem; font-weight: 700; color: white; background: var(--accent); cursor: pointer; transition: 0.2s; box-shadow: 0 4px 14px rgba(59,130,246,0.4); }
     .main-btn.active { background: var(--danger); box-shadow: 0 4px 14px rgba(239,68,68,0.4); }
@@ -174,11 +174,12 @@
           setup: {
             model: MODEL,
             generationConfig: {
-              responseModalities: ["TEXT"]
+              responseModalities: ["AUDIO"]
             },
+            outputAudioTranscription: {},
             systemInstruction: {
               parts: [{
-                text: `あなたは超高速な同時通訳字幕システムです。聞こえた音声をリアルタイムで翻訳し、${langA}なら${langB}のテキスト、${langB}なら${langA}のテキストのみを即座に出力してください。返事・相槌・解説・括弧書きは一切禁止です。文の終わりを待たず、聞こえたそばから自然な訳文を出力してください。`
+                text: `あなたは超高速な同時通訳者です。聞こえた音声をリアルタイムで翻訳し、${langA}なら${langB}へ、${langB}なら${langA}へ即座に翻訳してください。返事・相槌・解説は一切禁止です。文の終わりを待たず、聞こえたそばから自然な訳文のみを出力してください。`
               }]
             }
           }
@@ -195,13 +196,7 @@
         const raw = event.data instanceof Blob ? await event.data.text() : event.data;
         const data = JSON.parse(raw);
 
-        if (data.serverContent?.modelTurn?.parts) {
-          for (const part of data.serverContent.modelTurn.parts) {
-            if (part.text) {
-              appendTranscript(part.text);
-            }
-          }
-        }
+        // 音声は再生せず、リアルタイム文字起こし（字幕）のみを表示
         if (data.serverContent?.outputTranscription?.text) {
           appendTranscript(data.serverContent.outputTranscription.text);
         }
@@ -228,7 +223,6 @@
 
   function startMicStreaming() {
     const source = audioCtx.createMediaStreamSource(micStream);
-    // バッファサイズを1024に小さくして超低遅延で音声を送信
     processor = audioCtx.createScriptProcessor(1024, 1, 1);
 
     processor.onaudioprocess = (e) => {
@@ -245,24 +239,3 @@
           audio: { mimeType: "audio/pcm;rate=16000", data: base64 }
         }
       }));
-    };
-
-    source.connect(processor);
-    processor.connect(audioCtx.destination);
-  }
-
-  function stopSession(reasonMsg) {
-    isRunning = false;
-    if (processor) { processor.disconnect(); processor = null; }
-    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-    if (ws) { ws.close(); ws = null; }
-    if (audioCtx) { audioCtx.close(); audioCtx = null; }
-
-    const btn = document.getElementById("toggleBtn");
-    btn.textContent = "通訳開始";
-    btn.classList.remove("active");
-    if (reasonMsg) setStatus(reasonMsg);
-  }
-</script>
-</body>
-</html>
