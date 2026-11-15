@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AIリアルタイム字幕通訳 v4.2</title>
+  <title>AIリアルタイム字幕通訳 v4.3</title>
   <style>
     :root { --bg: #0f172a; --card: #1e293b; --accent: #3b82f6; --danger: #ef4444; --text: #f8fafc; --sub: #94a3b8; }
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -34,7 +34,7 @@
 <body>
 
 <header>
-  <h1>💬 リアルタイム字幕通訳 v4.2</h1>
+  <h1>💬 リアルタイム字幕通訳 v4.3</h1>
   <div class="header-btns">
     <button class="icon-btn" onclick="clearLogs()">🗑️ クリア</button>
     <button class="icon-btn" onclick="openModal()">⚙️ キー</button>
@@ -64,7 +64,7 @@
 </div>
 
 <div class="log-box" id="logBox">
-  <div class="status" id="statusText">「通訳開始」を押して話してください（自動連続認識）</div>
+  <div class="status" id="statusText">「通訳開始」を押して話してください（自動リトライ・分散対応）</div>
   <div class="interim-box" id="interimBox"></div>
 </div>
 
@@ -83,6 +83,14 @@
   let recognition = null;
   let isRunning = false;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  // 混雑回避のため高速なLiteモデルを優先し、失敗時は別モデルへ自動切替
+  const MODELS = [
+    "gemini-3.8-flash-lite",
+    "gemini-3.8-flash",
+    "gemini-flash-lite-latest",
+    "gemini-flash-latest"
+  ];
 
   window.onload = () => {
     if (!localStorage.getItem("gemini_api_key")) openModal();
@@ -222,6 +230,41 @@
     }
   }
 
+  async function fetchTranslationWithFallback(originalText, fromName, toName, apiKey) {
+    let lastError = "";
+    for (let i = 0; i < MODELS.length; i++) {
+      const model = MODELS[i];
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `以下の${fromName}の音声認識テキストを、文脈を補って自然な${toName}に翻訳してください。翻訳結果のみを出力し、解説や記号は一切不要です。\n\nテキスト: ${originalText}`
+              }]
+            }],
+            generationConfig: { temperature: 0.2 }
+          })
+        });
+        const data = await res.json();
+        if (data.error) {
+          lastError = data.error.message;
+          // 混雑(503)や制限(429)や非対応モデルの場合は次のモデルへ即座にフォールバック
+          await new Promise(r => setTimeout(r, 300));
+          continue;
+        }
+        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (result) return result;
+      } catch (err) {
+        lastError = err.message;
+        // SafariのLoad failed等は少し待って次のモデル/リトライへ
+        await new Promise(r => setTimeout(r, 400));
+      }
+    }
+    throw new Error(lastError || "翻訳に失敗しました");
+  }
+
   async function createAndTranslateCard(originalText, fromName, toName, apiKey) {
     if (!originalText) return;
     const box = document.getElementById("logBox");
@@ -244,27 +287,10 @@
     box.scrollTop = box.scrollHeight;
 
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `以下の${fromName}の音声認識テキストを、文脈を補って自然な${toName}に翻訳してください。翻訳結果のみを出力し、解説や記号は一切不要です。\n\nテキスト: ${originalText}`
-            }]
-          }],
-          generationConfig: { temperature: 0.2 }
-        })
-      });
-      const data = await res.json();
-      if (data.error) {
-        transDiv.textContent = "エラー: " + data.error.message;
-      } else {
-        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        transDiv.textContent = result || "（翻訳結果なし）";
-      }
+      const result = await fetchTranslationWithFallback(originalText, fromName, toName, apiKey);
+      transDiv.textContent = result;
     } catch (err) {
-      transDiv.textContent = "通信エラー: " + err.message;
+      transDiv.textContent = "再試行後もエラー: " + err.message;
     }
     box.scrollTop = box.scrollHeight;
   }
