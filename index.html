@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AIリアルタイム字幕通訳 v4.4</title>
+  <title>AIリアルタイム字幕通訳 v5.0</title>
   <style>
     :root { --bg: #0f172a; --card: #1e293b; --accent: #3b82f6; --danger: #ef4444; --text: #f8fafc; --sub: #94a3b8; }
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -20,7 +20,9 @@
     .swap-btn:active { transform: scale(0.92); background: #334155; }
     .log-box { flex: 1; background: var(--card); border-radius: 14px; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; border: 1px solid #334155; }
     .status { font-size: 0.85rem; color: var(--sub); text-align: center; padding: 4px; }
-    .interim-box { background: rgba(59, 130, 246, 0.12); border: 1px dashed var(--accent); color: #cbd5e1; padding: 10px 14px; border-radius: 10px; font-size: 1rem; min-height: 44px; display: none; }
+    .live-card { background: rgba(59, 130, 246, 0.14); border: 1px dashed var(--accent); padding: 12px 14px; border-radius: 12px; display: none; }
+    .live-orig { font-size: 0.85rem; color: #93c5fd; margin-bottom: 4px; }
+    .live-trans { font-size: 1.2rem; font-weight: 600; color: #e2e8f0; min-height: 1.4em; }
     .card-item { background: #0f172a; padding: 12px 14px; border-radius: 12px; border-left: 4px solid var(--accent); }
     .orig-text { font-size: 0.85rem; color: var(--sub); margin-bottom: 4px; }
     .trans-text { font-size: 1.25rem; font-weight: 600; line-height: 1.45; color: var(--text); }
@@ -34,7 +36,7 @@
 <body>
 
 <header>
-  <h1>💬 リアルタイム字幕通訳 v4.4</h1>
+  <h1>⚡ リアルタイム字幕通訳 v5.0</h1>
   <div class="header-btns">
     <button class="icon-btn" onclick="clearLogs()">🗑️ クリア</button>
     <button class="icon-btn" onclick="openModal()">⚙️ キー</button>
@@ -64,8 +66,11 @@
 </div>
 
 <div class="log-box" id="logBox">
-  <div class="status" id="statusText">「通訳開始」を押して話してください（高速タイムアウト制御対応）</div>
-  <div class="interim-box" id="interimBox"></div>
+  <div class="status" id="statusText">「通訳開始」を押して話してください（発話中先行翻訳＆高速表示）</div>
+  <div class="live-card" id="liveCard">
+    <div class="live-orig" id="liveOrig"></div>
+    <div class="live-trans" id="liveTrans"></div>
+  </div>
 </div>
 
 <button class="main-btn" id="toggleBtn" onclick="toggleRecognition()">通訳開始</button>
@@ -82,6 +87,9 @@
 <script>
   let recognition = null;
   let isRunning = false;
+  let interimTimer = null;
+  let lastInterimQuery = "";
+  let lastInterimResult = "";
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   const MODELS = [
@@ -114,10 +122,10 @@
   function clearLogs() {
     const box = document.getElementById("logBox");
     const status = document.getElementById("statusText");
-    const interim = document.getElementById("interimBox");
+    const liveCard = document.getElementById("liveCard");
     box.innerHTML = "";
     box.appendChild(status);
-    box.appendChild(interim);
+    box.appendChild(liveCard);
   }
 
   function swapLanguages() {
@@ -132,7 +140,7 @@
   function restartIfRunning() {
     if (isRunning) {
       stopRecognition(false);
-      setTimeout(() => startRecognition(), 200);
+      setTimeout(() => startRecognition(), 150);
     }
   }
 
@@ -161,13 +169,15 @@
     recognition.continuous = true;
 
     const btn = document.getElementById("toggleBtn");
-    const interimBox = document.getElementById("interimBox");
+    const liveCard = document.getElementById("liveCard");
+    const liveOrig = document.getElementById("liveOrig");
+    const liveTrans = document.getElementById("liveTrans");
 
     recognition.onstart = () => {
       isRunning = true;
       btn.textContent = "通訳を停止";
       btn.classList.add("active");
-      setStatus(`🟢 聞き取り中（${fromName} ➔ ${toName}）`);
+      setStatus(`⚡ 超高速通訳中（${fromName} ➔ ${toName}）`);
     };
 
     recognition.onresult = (event) => {
@@ -175,18 +185,42 @@
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          interimBox.style.display = "none";
-          interimBox.textContent = "";
-          createAndTranslateCard(transcript.trim(), fromIso, toIso, fromName, toName, apiKey);
+          clearTimeout(interimTimer);
+          const finalText = transcript.trim();
+          // 暫定翻訳がすでに同じ文を訳し終えていれば即座に流用（待ち時間0秒）
+          const preTranslated = (lastInterimQuery === finalText && lastInterimResult) ? lastInterimResult : null;
+          liveCard.style.display = "none";
+          liveOrig.textContent = "";
+          liveTrans.textContent = "";
+          lastInterimQuery = "";
+          lastInterimResult = "";
+          createAndTranslateCard(finalText, fromIso, toIso, fromName, toName, apiKey, preTranslated);
         } else {
           interimTranscript += transcript;
         }
       }
+
       if (interimTranscript) {
-        interimBox.style.display = "block";
-        interimBox.textContent = "🎤 " + interimTranscript;
-        const box = document.getElementById("logBox");
-        box.scrollTop = box.scrollHeight;
+        const cleanInterim = interimTranscript.trim();
+        liveCard.style.display = "block";
+        liveOrig.textContent = "🎤 " + cleanInterim;
+        document.getElementById("logBox").scrollTop = document.getElementById("logBox").scrollHeight;
+
+        // 話している途中でも0.6秒ごとに先行して翻訳を実行
+        if (cleanInterim.length >= 2 && cleanInterim !== lastInterimQuery) {
+          clearTimeout(interimTimer);
+          interimTimer = setTimeout(async () => {
+            lastInterimQuery = cleanInterim;
+            try {
+              const res = await translateFast(cleanInterim, fromIso, toIso, fromName, toName, apiKey, null);
+              if (liveCard.style.display === "block" && lastInterimQuery === cleanInterim) {
+                lastInterimResult = res;
+                liveTrans.textContent = res;
+                document.getElementById("logBox").scrollTop = document.getElementById("logBox").scrollHeight;
+              }
+            } catch (e) {}
+          }, 600);
+        }
       }
     };
 
@@ -213,12 +247,13 @@
 
   function stopRecognition(updateUi) {
     isRunning = false;
+    clearTimeout(interimTimer);
     if (recognition) {
       recognition.onend = null;
       try { recognition.stop(); } catch (e) {}
       recognition = null;
     }
-    document.getElementById("interimBox").style.display = "none";
+    document.getElementById("liveCard").style.display = "none";
     if (updateUi) {
       const btn = document.getElementById("toggleBtn");
       btn.textContent = "通訳開始";
@@ -227,8 +262,7 @@
     }
   }
 
-  // 4秒で強制タイムアウトするfetchラッパー（iOS Safariのハング防止）
-  async function fetchWithTimeout(url, options, timeoutMs = 4000) {
+  async function fetchWithTimeout(url, options, timeoutMs = 2500) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -241,53 +275,78 @@
     }
   }
 
-  async function translateText(originalText, fromIso, toIso, fromName, toName, apiKey) {
-    // 1. まずGeminiの超高速モデル（思考オフ設定）で試行
+  async function translateFast(originalText, fromIso, toIso, fromName, toName, apiKey, targetElement) {
     for (let i = 0; i < MODELS.length; i++) {
       const model = MODELS[i];
       try {
         const res = await fetchWithTimeout(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               contents: [{
                 parts: [{
-                  text: `Translate the following ${fromName} text into natural ${toName}. Output ONLY the translated text.\n\n${originalText}`
+                  text: `Translate ${fromName} to natural ${toName}. Output ONLY the translation:\n${originalText}`
                 }]
               }],
               generationConfig: {
                 temperature: 0.1,
+                maxOutputTokens: 256,
                 thinkingConfig: { thinkingBudget: 0 }
               }
             })
           },
-          3500
+          2500
         );
-        const data = await res.json();
-        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (result) return result;
-      } catch (e) {
-        // タイムアウトや混雑時は即座に次へ
-      }
+
+        if (!res.ok) continue;
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let fullText = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const json = JSON.parse(line.slice(6));
+                const part = json.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (part) {
+                  fullText += part;
+                  if (targetElement) {
+                    targetElement.textContent = fullText.trim();
+                    document.getElementById("logBox").scrollTop = document.getElementById("logBox").scrollHeight;
+                  }
+                }
+              } catch (e) {}
+            }
+          }
+        }
+        if (fullText.trim()) return fullText.trim();
+      } catch (e) {}
     }
 
-    // 2. Geminiが混雑・タイムアウトした場合は、無料の高速翻訳APIへ自動フォールバック
+    // 予備ルート（MyMemory API）へ2.5秒で即切替
     const fallbackUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(originalText)}&langpair=${fromIso}|${toIso}`;
-    const fbRes = await fetchWithTimeout(fallbackUrl, { method: "GET" }, 4000);
+    const fbRes = await fetchWithTimeout(fallbackUrl, { method: "GET" }, 2500);
     const fbData = await fbRes.json();
     if (fbData.responseData?.translatedText) {
+      if (targetElement) targetElement.textContent = fbData.responseData.translatedText;
       return fbData.responseData.translatedText;
     }
 
-    throw new Error("すべての翻訳サーバーが応答しませんでした");
+    throw new Error("タイムアウトしました");
   }
 
-  async function createAndTranslateCard(originalText, fromIso, toIso, fromName, toName, apiKey) {
+  async function createAndTranslateCard(originalText, fromIso, toIso, fromName, toName, apiKey, preTranslated) {
     if (!originalText) return;
     const box = document.getElementById("logBox");
-    const interimBox = document.getElementById("interimBox");
+    const liveCard = document.getElementById("liveCard");
 
     const card = document.createElement("div");
     card.className = "card-item";
@@ -298,16 +357,17 @@
 
     const transDiv = document.createElement("div");
     transDiv.className = "trans-text";
-    transDiv.textContent = "翻訳中...";
+    transDiv.textContent = preTranslated || "...";
 
     card.appendChild(origDiv);
     card.appendChild(transDiv);
-    box.insertBefore(card, interimBox);
+    box.insertBefore(card, liveCard);
     box.scrollTop = box.scrollHeight;
 
+    if (preTranslated) return;
+
     try {
-      const result = await translateText(originalText, fromIso, toIso, fromName, toName, apiKey);
-      transDiv.textContent = result;
+      await translateFast(originalText, fromIso, toIso, fromName, toName, apiKey, transDiv);
     } catch (err) {
       transDiv.textContent = "エラー: " + err.message;
     }
