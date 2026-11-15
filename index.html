@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AIリアルタイム字幕通訳 v5.0</title>
+  <link rel="preconnect" href="https://generativelanguage.googleapis.com" crossorigin />
+  <title>AIリアルタイム字幕通訳 v5.1</title>
   <style>
     :root { --bg: #0f172a; --card: #1e293b; --accent: #3b82f6; --danger: #ef4444; --text: #f8fafc; --sub: #94a3b8; }
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -17,7 +18,6 @@
     .lang-bar { display: flex; gap: 8px; align-items: center; background: var(--card); padding: 8px; border-radius: 12px; margin-bottom: 10px; }
     select { flex: 1; background: #0f172a; color: var(--text); border: 1px solid #334155; padding: 10px; border-radius: 8px; font-size: 1rem; font-weight: 600; }
     .swap-btn { background: #0f172a; border: 1px solid #334155; color: var(--text); font-size: 1.2rem; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
-    .swap-btn:active { transform: scale(0.92); background: #334155; }
     .log-box { flex: 1; background: var(--card); border-radius: 14px; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; border: 1px solid #334155; }
     .status { font-size: 0.85rem; color: var(--sub); text-align: center; padding: 4px; }
     .live-card { background: rgba(59, 130, 246, 0.14); border: 1px dashed var(--accent); padding: 12px 14px; border-radius: 12px; display: none; }
@@ -26,8 +26,8 @@
     .card-item { background: #0f172a; padding: 12px 14px; border-radius: 12px; border-left: 4px solid var(--accent); }
     .orig-text { font-size: 0.85rem; color: var(--sub); margin-bottom: 4px; }
     .trans-text { font-size: 1.25rem; font-weight: 600; line-height: 1.45; color: var(--text); }
-    .main-btn { width: 100%; padding: 18px; border-radius: 16px; border: none; font-size: 1.15rem; font-weight: 700; color: white; background: var(--accent); cursor: pointer; box-shadow: 0 4px 14px rgba(59,130,246,0.4); -webkit-tap-highlight-color: transparent; }
-    .main-btn.active { background: var(--danger); box-shadow: 0 4px 14px rgba(239,68,68,0.4); }
+    .main-btn { width: 100%; padding: 18px; border-radius: 16px; border: none; font-size: 1.15rem; font-weight: 700; color: white; background: var(--accent); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .main-btn.active { background: var(--danger); }
     #apiModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; padding: 20px; z-index: 50; }
     .modal-card { background: var(--card); padding: 20px; border-radius: 16px; width: 100%; max-width: 400px; }
     .modal-card input { width: 100%; padding: 12px; margin: 12px 0; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; }
@@ -36,7 +36,7 @@
 <body>
 
 <header>
-  <h1>⚡ リアルタイム字幕通訳 v5.0</h1>
+  <h1>⚡ リアルタイム字幕通訳 v5.1</h1>
   <div class="header-btns">
     <button class="icon-btn" onclick="clearLogs()">🗑️ クリア</button>
     <button class="icon-btn" onclick="openModal()">⚙️ キー</button>
@@ -45,28 +45,28 @@
 
 <div class="lang-bar">
   <select id="langFrom" onchange="restartIfRunning()">
-    <option value="ja-JP|ja|日本語" selected>🇯🇵 日本語から</option>
-    <option value="en-US|en|英語">🇺🇸 英語から</option>
-    <option value="zh-CN|zh-CN|中国語">🇨🇳 中国語から</option>
-    <option value="ko-KR|ko|韓国語">🇰🇷 韓国語から</option>
-    <option value="es-ES|es|スペイン語">🇪🇸 スペイン語から</option>
-    <option value="fr-FR|fr|フランス語">🇫🇷 フランス語から</option>
-    <option value="de-DE|de|ドイツ語">🇩🇪 ドイツ語から</option>
+    <option value="ja-JP|ja|Japanese" selected>🇯🇵 日本語から</option>
+    <option value="en-US|en|English">🇺🇸 英語から</option>
+    <option value="zh-CN|zh-CN|Chinese">🇨🇳 中国語から</option>
+    <option value="ko-KR|ko|Korean">🇰🇷 韓国語から</option>
+    <option value="es-ES|es|Spanish">🇪🇸 スペイン語から</option>
+    <option value="fr-FR|fr|French">🇫🇷 フランス語から</option>
+    <option value="de-DE|de|German">🇩🇪 ドイツ語から</option>
   </select>
-  <button class="swap-btn" onclick="swapLanguages()" title="言語を入れ替え">⇄</button>
+  <button class="swap-btn" onclick="swapLanguages()">⇄</button>
   <select id="langTo" onchange="restartIfRunning()">
-    <option value="en-US|en|英語" selected>🇺🇸 英語へ</option>
-    <option value="ja-JP|ja|日本語">🇯🇵 日本語へ</option>
-    <option value="zh-CN|zh-CN|中国語">🇨🇳 中国語へ</option>
-    <option value="ko-KR|ko|韓国語">🇰🇷 韓国語へ</option>
-    <option value="es-ES|es|スペイン語">🇪🇸 スペイン語へ</option>
-    <option value="fr-FR|fr|フランス語">🇫🇷 フランス語へ</option>
-    <option value="de-DE|de|ドイツ語">🇩🇪 ドイツ語へ</option>
+    <option value="en-US|en|English" selected>🇺🇸 英語へ</option>
+    <option value="ja-JP|ja|Japanese">🇯🇵 日本語へ</option>
+    <option value="zh-CN|zh-CN|Chinese">🇨🇳 中国語へ</option>
+    <option value="ko-KR|ko|Korean">🇰🇷 韓国語へ</option>
+    <option value="es-ES|es|Spanish">🇪🇸 スペイン語へ</option>
+    <option value="fr-FR|fr|French">🇫🇷 フランス語へ</option>
+    <option value="de-DE|de|German">🇩🇪 ドイツ語へ</option>
   </select>
 </div>
 
 <div class="log-box" id="logBox">
-  <div class="status" id="statusText">「通訳開始」を押して話してください（発話中先行翻訳＆高速表示）</div>
+  <div class="status" id="statusText">「通訳開始」を押して話してください（最速0.25秒間隔先行翻訳）</div>
   <div class="live-card" id="liveCard">
     <div class="live-orig" id="liveOrig"></div>
     <div class="live-trans" id="liveTrans"></div>
@@ -78,7 +78,6 @@
 <div id="apiModal">
   <div class="modal-card">
     <h3 style="margin-top:0">Gemini APIキー設定</h3>
-    <p style="font-size:0.85rem; color:#cbd5e1;">キーはこのスマホのブラウザ内にのみ保存されます。</p>
     <input type="password" id="apiKeyInput" placeholder="APIキーを貼り付け..." />
     <button class="main-btn" style="padding:12px; font-size:1rem;" onclick="saveKey()">保存する</button>
   </div>
@@ -88,14 +87,10 @@
   let recognition = null;
   let isRunning = false;
   let interimTimer = null;
+  let activeController = null;
   let lastInterimQuery = "";
   let lastInterimResult = "";
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  const MODELS = [
-    "gemini-3.8-flash-lite",
-    "gemini-3.8-flash"
-  ];
 
   window.onload = () => {
     if (!localStorage.getItem("gemini_api_key")) openModal();
@@ -140,7 +135,7 @@
   function restartIfRunning() {
     if (isRunning) {
       stopRecognition(false);
-      setTimeout(() => startRecognition(), 150);
+      setTimeout(() => startRecognition(), 100);
     }
   }
 
@@ -155,10 +150,7 @@
   function startRecognition() {
     const apiKey = localStorage.getItem("gemini_api_key");
     if (!apiKey) return openModal();
-    if (!SpeechRecognition) {
-      setStatus("このブラウザは音声認識に対応していません（Safariをご利用ください）");
-      return;
-    }
+    if (!SpeechRecognition) return setStatus("Safariをご利用ください");
 
     const [fromSpeech, fromIso, fromName] = document.getElementById("langFrom").value.split("|");
     const [, toIso, toName] = document.getElementById("langTo").value.split("|");
@@ -177,7 +169,7 @@
       isRunning = true;
       btn.textContent = "通訳を停止";
       btn.classList.add("active");
-      setStatus(`⚡ 超高速通訳中（${fromName} ➔ ${toName}）`);
+      setStatus(`⚡ 最速モード稼働中`);
     };
 
     recognition.onresult = (event) => {
@@ -187,14 +179,13 @@
         if (event.results[i].isFinal) {
           clearTimeout(interimTimer);
           const finalText = transcript.trim();
-          // 暫定翻訳がすでに同じ文を訳し終えていれば即座に流用（待ち時間0秒）
           const preTranslated = (lastInterimQuery === finalText && lastInterimResult) ? lastInterimResult : null;
           liveCard.style.display = "none";
           liveOrig.textContent = "";
           liveTrans.textContent = "";
           lastInterimQuery = "";
           lastInterimResult = "";
-          createAndTranslateCard(finalText, fromIso, toIso, fromName, toName, apiKey, preTranslated);
+          createAndTranslateCard(finalText, fromIso, toIso, toName, apiKey, preTranslated);
         } else {
           interimTranscript += transcript;
         }
@@ -206,30 +197,24 @@
         liveOrig.textContent = "🎤 " + cleanInterim;
         document.getElementById("logBox").scrollTop = document.getElementById("logBox").scrollHeight;
 
-        // 話している途中でも0.6秒ごとに先行して翻訳を実行
         if (cleanInterim.length >= 2 && cleanInterim !== lastInterimQuery) {
           clearTimeout(interimTimer);
           interimTimer = setTimeout(async () => {
             lastInterimQuery = cleanInterim;
             try {
-              const res = await translateFast(cleanInterim, fromIso, toIso, fromName, toName, apiKey, null);
+              const res = await translateUltraFast(cleanInterim, fromIso, toIso, toName, apiKey, liveTrans, true);
               if (liveCard.style.display === "block" && lastInterimQuery === cleanInterim) {
                 lastInterimResult = res;
-                liveTrans.textContent = res;
-                document.getElementById("logBox").scrollTop = document.getElementById("logBox").scrollHeight;
               }
             } catch (e) {}
-          }, 600);
+          }, 250);
         }
       }
     };
 
     recognition.onerror = (event) => {
       if (event.error === "no-speech") return;
-      if (event.error === "not-allowed") {
-        setStatus("マイクの許可が必要です（Safariの設定を確認してください）");
-        stopRecognition(true);
-      }
+      if (event.error === "not-allowed") stopRecognition(true);
     };
 
     recognition.onend = () => {
@@ -238,16 +223,13 @@
       }
     };
 
-    try {
-      recognition.start();
-    } catch (e) {
-      setStatus("開始エラー: " + e.message);
-    }
+    try { recognition.start(); } catch (e) {}
   }
 
   function stopRecognition(updateUi) {
     isRunning = false;
     clearTimeout(interimTimer);
+    if (activeController) activeController.abort();
     if (recognition) {
       recognition.onend = null;
       try { recognition.stop(); } catch (e) {}
@@ -258,92 +240,71 @@
       const btn = document.getElementById("toggleBtn");
       btn.textContent = "通訳開始";
       btn.classList.remove("active");
-      setStatus("停止中（「通訳開始」で再開）");
+      setStatus("停止中");
     }
   }
 
-  async function fetchWithTimeout(url, options, timeoutMs = 2500) {
+  async function translateUltraFast(text, fromIso, toIso, toName, apiKey, targetEl, isInterim) {
+    if (isInterim && activeController) activeController.abort();
     const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs);
+    if (isInterim) activeController = controller;
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
     try {
-      const response = await fetch(url, { ...options, signal: controller.signal });
-      clearTimeout(id);
-      return response;
-    } catch (err) {
-      clearTimeout(id);
-      throw err;
-    }
-  }
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-lite:streamGenerateContent?alt=sse&key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `To ${toName}:\n${text}` }] }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 150,
+              thinkingConfig: { thinkingBudget: 0 }
+            }
+          })
+        }
+      );
+      clearTimeout(timeoutId);
 
-  async function translateFast(originalText, fromIso, toIso, fromName, toName, apiKey, targetElement) {
-    for (let i = 0; i < MODELS.length; i++) {
-      const model = MODELS[i];
-      try {
-        const res = await fetchWithTimeout(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
-                parts: [{
-                  text: `Translate ${fromName} to natural ${toName}. Output ONLY the translation:\n${originalText}`
-                }]
-              }],
-              generationConfig: {
-                temperature: 0.1,
-                maxOutputTokens: 256,
-                thinkingConfig: { thinkingBudget: 0 }
-              }
-            })
-          },
-          2500
-        );
-
-        if (!res.ok) continue;
-
+      if (res.ok) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let fullText = "";
-
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
+          const lines = decoder.decode(value, { stream: true }).split("\n");
           for (const line of lines) {
             if (line.startsWith("data: ")) {
               try {
-                const json = JSON.parse(line.slice(6));
-                const part = json.candidates?.[0]?.content?.parts?.[0]?.text;
+                const part = JSON.parse(line.slice(6)).candidates?.[0]?.content?.parts?.[0]?.text;
                 if (part) {
                   fullText += part;
-                  if (targetElement) {
-                    targetElement.textContent = fullText.trim();
-                    document.getElementById("logBox").scrollTop = document.getElementById("logBox").scrollHeight;
-                  }
+                  if (targetEl) targetEl.textContent = fullText.trim();
                 }
               } catch (e) {}
             }
           }
         }
         if (fullText.trim()) return fullText.trim();
-      } catch (e) {}
+      }
+    } catch (e) {
+      clearTimeout(timeoutId);
+      if (e.name === "AbortError" && isInterim) return "";
     }
 
-    // 予備ルート（MyMemory API）へ2.5秒で即切替
-    const fallbackUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(originalText)}&langpair=${fromIso}|${toIso}`;
-    const fbRes = await fetchWithTimeout(fallbackUrl, { method: "GET" }, 2500);
+    // 2秒以内で返らない場合の即座フォールバック
+    const fbRes = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${fromIso}|${toIso}`);
     const fbData = await fbRes.json();
-    if (fbData.responseData?.translatedText) {
-      if (targetElement) targetElement.textContent = fbData.responseData.translatedText;
-      return fbData.responseData.translatedText;
-    }
-
-    throw new Error("タイムアウトしました");
+    const fbText = fbData.responseData?.translatedText || "";
+    if (targetEl && fbText) targetEl.textContent = fbText;
+    return fbText;
   }
 
-  async function createAndTranslateCard(originalText, fromIso, toIso, fromName, toName, apiKey, preTranslated) {
+  async function createAndTranslateCard(originalText, fromIso, toIso, toName, apiKey, preTranslated) {
     if (!originalText) return;
     const box = document.getElementById("logBox");
     const liveCard = document.getElementById("liveCard");
@@ -367,7 +328,7 @@
     if (preTranslated) return;
 
     try {
-      await translateFast(originalText, fromIso, toIso, fromName, toName, apiKey, transDiv);
+      await translateUltraFast(originalText, fromIso, toIso, toName, apiKey, transDiv, false);
     } catch (err) {
       transDiv.textContent = "エラー: " + err.message;
     }
