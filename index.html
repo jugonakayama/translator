@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AIリアルタイム字幕通訳 v3.0</title>
+  <title>AIリアルタイム字幕通訳 v4.0</title>
   <style>
-    :root { --bg: #0f172a; --card: #1e293b; --accent: #3b82f6; --danger: #ef4444; --text: #f8fafc; }
+    :root { --bg: #0f172a; --card: #1e293b; --accent: #3b82f6; --danger: #ef4444; --text: #f8fafc; --sub: #94a3b8; }
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { margin: 0; background: var(--bg); color: var(--text); display: flex; flex-direction: column; height: 100dvh; padding: 14px; }
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
@@ -18,10 +18,13 @@
     select { flex: 1; background: #0f172a; color: var(--text); border: 1px solid #334155; padding: 10px; border-radius: 8px; font-size: 1rem; font-weight: 600; }
     .swap-btn { background: #0f172a; border: 1px solid #334155; color: var(--text); font-size: 1.2rem; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
     .swap-btn:active { transform: scale(0.92); background: #334155; }
-    .log-box { flex: 1; background: var(--card); border-radius: 14px; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; border: 1px solid #334155; scroll-behavior: smooth; }
-    .status { font-size: 0.85rem; color: #94a3b8; text-align: center; padding: 4px; word-break: break-all; }
-    .transcript { font-size: 1.3rem; font-weight: 500; line-height: 1.55; background: #0f172a; padding: 14px 16px; border-radius: 12px; border-left: 5px solid var(--accent); letter-spacing: 0.02em; }
-    .main-btn { width: 100%; padding: 18px; border-radius: 16px; border: none; font-size: 1.15rem; font-weight: 700; color: white; background: var(--accent); cursor: pointer; transition: 0.2s; box-shadow: 0 4px 14px rgba(59,130,246,0.4); -webkit-tap-highlight-color: transparent; }
+    .log-box { flex: 1; background: var(--card); border-radius: 14px; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; border: 1px solid #334155; }
+    .status { font-size: 0.85rem; color: var(--sub); text-align: center; padding: 4px; }
+    .interim-box { background: rgba(59, 130, 246, 0.12); border: 1px dashed var(--accent); color: #cbd5e1; padding: 10px 14px; border-radius: 10px; font-size: 1rem; min-height: 44px; display: none; }
+    .card-item { background: #0f172a; padding: 12px 14px; border-radius: 12px; border-left: 4px solid var(--accent); }
+    .orig-text { font-size: 0.85rem; color: var(--sub); margin-bottom: 4px; }
+    .trans-text { font-size: 1.25rem; font-weight: 600; line-height: 1.45; color: var(--text); }
+    .main-btn { width: 100%; padding: 18px; border-radius: 16px; border: none; font-size: 1.15rem; font-weight: 700; color: white; background: var(--accent); cursor: pointer; box-shadow: 0 4px 14px rgba(59,130,246,0.4); -webkit-tap-highlight-color: transparent; }
     .main-btn.active { background: var(--danger); box-shadow: 0 4px 14px rgba(239,68,68,0.4); }
     #apiModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; padding: 20px; z-index: 50; }
     .modal-card { background: var(--card); padding: 20px; border-radius: 16px; width: 100%; max-width: 400px; }
@@ -31,7 +34,7 @@
 <body>
 
 <header>
-  <h1>💬 リアルタイム字幕通訳 v3.0</h1>
+  <h1>💬 リアルタイム字幕通訳 v4.0</h1>
   <div class="header-btns">
     <button class="icon-btn" onclick="clearLogs()">🗑️ クリア</button>
     <button class="icon-btn" onclick="openModal()">⚙️ キー</button>
@@ -39,32 +42,33 @@
 </header>
 
 <div class="lang-bar">
-  <select id="langA" onchange="onLangChange()">
-    <option value="日本語" selected>🇯🇵 日本語</option>
-    <option value="英語">🇺🇸 英語</option>
-    <option value="中国語">🇨🇳 中国語</option>
-    <option value="韓国語">🇰🇷 韓国語</option>
-    <option value="スペイン語">🇪🇸 スペイン語</option>
-    <option value="フランス語">🇫🇷 フランス語</option>
-    <option value="ドイツ語">🇩🇪 ドイツ語</option>
+  <select id="langFrom" onchange="restartIfRunning()">
+    <option value="ja-JP|日本語" selected>🇯🇵 日本語から</option>
+    <option value="en-US|英語">🇺🇸 英語から</option>
+    <option value="zh-CN|中国語">🇨🇳 中国語から</option>
+    <option value="ko-KR|韓国語">🇰🇷 韓国語から</option>
+    <option value="es-ES|スペイン語">🇪🇸 スペイン語から</option>
+    <option value="fr-FR|フランス語">🇫🇷 フランス語から</option>
+    <option value="de-DE|ドイツ語">🇩🇪 ドイツ語から</option>
   </select>
   <button class="swap-btn" onclick="swapLanguages()" title="言語を入れ替え">⇄</button>
-  <select id="langB" onchange="onLangChange()">
-    <option value="英語" selected>🇺🇸 英語</option>
-    <option value="日本語">🇯🇵 日本語</option>
-    <option value="中国語">🇨🇳 中国語</option>
-    <option value="韓国語">🇰🇷 韓国語</option>
-    <option value="スペイン語">🇪🇸 スペイン語</option>
-    <option value="フランス語">🇫🇷 フランス語</option>
-    <option value="ドイツ語">🇩🇪 ドイツ語</option>
+  <select id="langTo" onchange="restartIfRunning()">
+    <option value="en-US|英語" selected>🇺🇸 英語へ</option>
+    <option value="ja-JP|日本語">🇯🇵 日本語へ</option>
+    <option value="zh-CN|中国語">🇨🇳 中国語へ</option>
+    <option value="ko-KR|韓国語">🇰🇷 韓国語へ</option>
+    <option value="es-ES|スペイン語">🇪🇸 スペイン語へ</option>
+    <option value="fr-FR|フランス語">🇫🇷 フランス語へ</option>
+    <option value="de-DE|ドイツ語">🇩🇪 ドイツ語へ</option>
   </select>
 </div>
 
 <div class="log-box" id="logBox">
-  <div class="status" id="statusText">「通訳開始」を押すと文字でリアルタイム翻訳されます</div>
+  <div class="status" id="statusText">「通訳開始」を押して話してください（自動連続認識）</div>
+  <div class="interim-box" id="interimBox"></div>
 </div>
 
-<button class="main-btn" id="toggleBtn" onclick="toggleSession()">通訳開始</button>
+<button class="main-btn" id="toggleBtn" onclick="toggleRecognition()">通訳開始</button>
 
 <div id="apiModal">
   <div class="modal-card">
@@ -76,13 +80,9 @@
 </div>
 
 <script>
-  let ws = null;
-  let audioCtx = null;
-  let micStream = null;
-  let processor = null;
+  let recognition = null;
   let isRunning = false;
-
-  const MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025";
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   window.onload = () => {
     if (!localStorage.getItem("gemini_api_key")) openModal();
@@ -102,179 +102,172 @@
     }
   }
 
-  function clearLogs() {
-    const box = document.getElementById("logBox");
-    const status = document.getElementById("statusText");
-    box.innerHTML = "";
-    box.appendChild(status);
-  }
-
-  async function swapLanguages() {
-    const selA = document.getElementById("langA");
-    const selB = document.getElementById("langB");
-    const temp = selA.value;
-    selA.value = selB.value;
-    selB.value = temp;
-    await onLangChange();
-  }
-
-  async function onLangChange() {
-    if (isRunning) {
-      stopSession();
-      await startSession();
-    }
-  }
-
   function setStatus(msg) {
     document.getElementById("statusText").textContent = msg;
   }
 
-  function appendTranscript(text) {
-    if (!text) return;
+  function clearLogs() {
     const box = document.getElementById("logBox");
-    let last = box.lastElementChild;
-    if (!last || !last.classList.contains("transcript") || last.dataset.done === "true") {
-      last = document.createElement("div");
-      last.className = "transcript";
-      box.appendChild(last);
-    }
-    last.textContent += text;
-    box.scrollTop = box.scrollHeight;
+    const status = document.getElementById("statusText");
+    const interim = document.getElementById("interimBox");
+    box.innerHTML = "";
+    box.appendChild(status);
+    box.appendChild(interim);
   }
 
-  async function toggleSession() {
+  function swapLanguages() {
+    const fromSel = document.getElementById("langFrom");
+    const toSel = document.getElementById("langTo");
+    const temp = fromSel.value;
+    fromSel.value = toSel.value;
+    toSel.value = temp;
+    restartIfRunning();
+  }
+
+  function restartIfRunning() {
     if (isRunning) {
-      stopSession("停止中（「通訳開始」で再開）");
+      stopRecognition(false);
+      setTimeout(() => startRecognition(), 200);
+    }
+  }
+
+  function toggleRecognition() {
+    if (isRunning) {
+      stopRecognition(true);
     } else {
-      await startSession();
+      startRecognition();
     }
   }
 
-  async function startSession() {
-    setStatus("⏳ マイクとサーバーに接続中...");
+  function startRecognition() {
     const apiKey = localStorage.getItem("gemini_api_key");
-    if (!apiKey) {
-      setStatus("APIキーが未設定です");
-      return openModal();
+    if (!apiKey) return openModal();
+    if (!SpeechRecognition) {
+      setStatus("このブラウザは音声認識に対応していません（Safariをご利用ください）");
+      return;
     }
 
-    const langA = document.getElementById("langA").value;
-    const langB = document.getElementById("langB").value;
+    const [fromCode, fromName] = document.getElementById("langFrom").value.split("|");
+    const [, toName] = document.getElementById("langTo").value.split("|");
+
+    recognition = new SpeechRecognition();
+    recognition.lang = fromCode;
+    recognition.interimResults = true; // 話している途中の文字もリアルタイム表示
+    recognition.continuous = true;
+
     const btn = document.getElementById("toggleBtn");
+    const interimBox = document.getElementById("interimBox");
 
-    try {
-      // iPhone Safariの標準レートに任せて初期化（強制16000Hz指定のエラーを回避）
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      audioCtx = new AudioContextClass();
-      if (audioCtx.state === "suspended") await audioCtx.resume();
-
-      micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-      });
-
-      const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
-      ws = new WebSocket(url);
-
-      ws.onopen = () => {
-        const setupMsg = {
-          setup: {
-            model: MODEL,
-            generationConfig: {
-              responseModalities: ["AUDIO"]
-            },
-            outputAudioTranscription: {},
-            systemInstruction: {
-              parts: [{
-                text: `あなたは超高速な同時通訳者です。聞こえた音声をリアルタイムで翻訳し、${langA}なら${langB}へ、${langB}なら${langA}へ即座に翻訳してください。返事・相槌・解説は一切禁止です。文の終わりを待たず、聞こえたそばから自然な訳文のみを出力してください。`
-              }]
-            }
-          }
-        };
-        ws.send(JSON.stringify(setupMsg));
-        startMicStreaming();
-        isRunning = true;
-        btn.textContent = "通訳を停止";
-        btn.classList.add("active");
-        setStatus(`🟢 リアルタイム字幕中（${langA} ⇄ ${langB}）`);
-      };
-
-      ws.onmessage = async (event) => {
-        const raw = event.data instanceof Blob ? await event.data.text() : event.data;
-        const data = JSON.parse(raw);
-
-        if (data.serverContent?.outputTranscription?.text) {
-          appendTranscript(data.serverContent.outputTranscription.text);
-        }
-        if (data.serverContent?.turnComplete) {
-          const last = document.getElementById("logBox").lastElementChild;
-          if (last && last.classList.contains("transcript")) last.dataset.done = "true";
-        }
-      };
-
-      ws.onerror = () => {
-        stopSession("通信エラーが発生しました（APIキーを確認してください）");
-      };
-
-      ws.onclose = (e) => {
-        if (isRunning) {
-          stopSession(`切断されました (コード:${e.code} ${e.reason || ""})`);
-        }
-      };
-
-    } catch (err) {
-      stopSession("起動エラー: " + err.message);
-    }
-  }
-
-  function startMicStreaming() {
-    const source = audioCtx.createMediaStreamSource(micStream);
-    processor = audioCtx.createScriptProcessor(2048, 1, 1);
-    const inputSampleRate = audioCtx.sampleRate;
-    const targetSampleRate = 16000;
-
-    processor.onaudioprocess = (e) => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      const floatData = e.inputBuffer.getChannelData(0);
-      
-      // iPhoneの48000Hz音声を16000Hzへ綺麗にダウンサンプリング
-      const ratio = inputSampleRate / targetSampleRate;
-      const newLength = Math.round(floatData.length / ratio);
-      const pcm16 = new Int16Array(newLength);
-      for (let i = 0; i < newLength; i++) {
-        const idx = Math.min(floatData.length - 1, Math.round(i * ratio));
-        const s = Math.max(-1, Math.min(1, floatData[idx]));
-        pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-      }
-
-      const bytes = new Uint8Array(pcm16.buffer);
-      let binary = "";
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64 = btoa(binary);
-
-      ws.send(JSON.stringify({
-        realtimeInput: {
-          audio: { mimeType: "audio/pcm;rate=16000", data: base64 }
-        }
-      }));
+    recognition.onstart = () => {
+      isRunning = true;
+      btn.textContent = "通訳を停止";
+      btn.classList.add("active");
+      setStatus(`🟢 聞き取り中（${fromName} ➔ ${toName}）`);
     };
 
-    source.connect(processor);
-    processor.connect(audioCtx.destination);
+    recognition.onresult = (event) => {
+      let interimTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          interimBox.style.display = "none";
+          interimBox.textContent = "";
+          createAndTranslateCard(transcript.trim(), fromName, toName, apiKey);
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      if (interimTranscript) {
+        interimBox.style.display = "block";
+        interimBox.textContent = "🎤 " + interimTranscript;
+        const box = document.getElementById("logBox");
+        box.scrollTop = box.scrollHeight;
+      }
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error === "no-speech") return; // 無音エラーは無視して継続
+      if (event.error === "not-allowed") {
+        setStatus("マイクの許可が必要です（Safariの設定を確認してください）");
+        stopRecognition(true);
+      }
+    };
+
+    // iOSで認識が自動終了しても、停止ボタンを押すまでは即座に自動再開する
+    recognition.onend = () => {
+      if (isRunning) {
+        try { recognition.start(); } catch (e) {}
+      }
+    };
+
+    try {
+      recognition.start();
+    } catch (e) {
+      setStatus("開始エラー: " + e.message);
+    }
   }
 
-  function stopSession(reasonMsg) {
+  function stopRecognition(updateUi) {
     isRunning = false;
-    if (processor) { processor.disconnect(); processor = null; }
-    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-    if (ws) { ws.close(); ws = null; }
-    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+    if (recognition) {
+      recognition.onend = null;
+      try { recognition.stop(); } catch (e) {}
+      recognition = null;
+    }
+    document.getElementById("interimBox").style.display = "none";
+    if (updateUi) {
+      const btn = document.getElementById("toggleBtn");
+      btn.textContent = "通訳開始";
+      btn.classList.remove("active");
+      setStatus("停止中（「通訳開始」で再開）");
+    }
+  }
 
-    const btn = document.getElementById("toggleBtn");
-    btn.textContent = "通訳開始";
-    btn.classList.remove("active");
-    if (reasonMsg) setStatus(reasonMsg);
+  async function createAndTranslateCard(originalText, fromName, toName, apiKey) {
+    if (!originalText) return;
+    const box = document.getElementById("logBox");
+    const interimBox = document.getElementById("interimBox");
+
+    const card = document.createElement("div");
+    card.className = "card-item";
+
+    const origDiv = document.createElement("div");
+    origDiv.className = "orig-text";
+    origDiv.textContent = originalText;
+
+    const transDiv = document.createElement("div");
+    transDiv.className = "trans-text";
+    transDiv.textContent = "翻訳中...";
+
+    card.appendChild(origDiv);
+    card.appendChild(transDiv);
+    box.insertBefore(card, interimBox);
+    box.scrollTop = box.scrollHeight;
+
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `以下の${fromName}の音声認識テキストを、文脈を補って自然な${toName}に翻訳してください。翻訳結果のみを出力し、解説や記号は一切不要です。\n\nテキスト: ${originalText}`
+            }]
+          }],
+          generationConfig: { temperature: 0.2 }
+        })
+      });
+      const data = await res.json();
+      if (data.error) {
+        transDiv.textContent = "エラー: " + data.error.message;
+      } else {
+        const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        transDiv.textContent = result || "（翻訳結果なし）";
+      }
+    } catch (err) {
+      transDiv.textContent = "通信エラー: " + err.message;
+    }
+    box.scrollTop = box.scrollHeight;
   }
 </script>
 </body>
