@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AIリアルタイム字幕通訳 v4.3</title>
+  <title>AIリアルタイム字幕通訳 v4.4</title>
   <style>
     :root { --bg: #0f172a; --card: #1e293b; --accent: #3b82f6; --danger: #ef4444; --text: #f8fafc; --sub: #94a3b8; }
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -34,7 +34,7 @@
 <body>
 
 <header>
-  <h1>💬 リアルタイム字幕通訳 v4.3</h1>
+  <h1>💬 リアルタイム字幕通訳 v4.4</h1>
   <div class="header-btns">
     <button class="icon-btn" onclick="clearLogs()">🗑️ クリア</button>
     <button class="icon-btn" onclick="openModal()">⚙️ キー</button>
@@ -43,28 +43,28 @@
 
 <div class="lang-bar">
   <select id="langFrom" onchange="restartIfRunning()">
-    <option value="ja-JP|日本語" selected>🇯🇵 日本語から</option>
-    <option value="en-US|英語">🇺🇸 英語から</option>
-    <option value="zh-CN|中国語">🇨🇳 中国語から</option>
-    <option value="ko-KR|韓国語">🇰🇷 韓国語から</option>
-    <option value="es-ES|スペイン語">🇪🇸 スペイン語から</option>
-    <option value="fr-FR|フランス語">🇫🇷 フランス語から</option>
-    <option value="de-DE|ドイツ語">🇩🇪 ドイツ語から</option>
+    <option value="ja-JP|ja|日本語" selected>🇯🇵 日本語から</option>
+    <option value="en-US|en|英語">🇺🇸 英語から</option>
+    <option value="zh-CN|zh-CN|中国語">🇨🇳 中国語から</option>
+    <option value="ko-KR|ko|韓国語">🇰🇷 韓国語から</option>
+    <option value="es-ES|es|スペイン語">🇪🇸 スペイン語から</option>
+    <option value="fr-FR|fr|フランス語">🇫🇷 フランス語から</option>
+    <option value="de-DE|de|ドイツ語">🇩🇪 ドイツ語から</option>
   </select>
   <button class="swap-btn" onclick="swapLanguages()" title="言語を入れ替え">⇄</button>
   <select id="langTo" onchange="restartIfRunning()">
-    <option value="en-US|英語" selected>🇺🇸 英語へ</option>
-    <option value="ja-JP|日本語">🇯🇵 日本語へ</option>
-    <option value="zh-CN|中国語">🇨🇳 中国語へ</option>
-    <option value="ko-KR|韓国語">🇰🇷 韓国語へ</option>
-    <option value="es-ES|スペイン語">🇪🇸 スペイン語へ</option>
-    <option value="fr-FR|フランス語">🇫🇷 フランス語へ</option>
-    <option value="de-DE|ドイツ語">🇩🇪 ドイツ語へ</option>
+    <option value="en-US|en|英語" selected>🇺🇸 英語へ</option>
+    <option value="ja-JP|ja|日本語">🇯🇵 日本語へ</option>
+    <option value="zh-CN|zh-CN|中国語">🇨🇳 中国語へ</option>
+    <option value="ko-KR|ko|韓国語">🇰🇷 韓国語へ</option>
+    <option value="es-ES|es|スペイン語">🇪🇸 スペイン語へ</option>
+    <option value="fr-FR|fr|フランス語">🇫🇷 フランス語へ</option>
+    <option value="de-DE|de|ドイツ語">🇩🇪 ドイツ語へ</option>
   </select>
 </div>
 
 <div class="log-box" id="logBox">
-  <div class="status" id="statusText">「通訳開始」を押して話してください（自動リトライ・分散対応）</div>
+  <div class="status" id="statusText">「通訳開始」を押して話してください（高速タイムアウト制御対応）</div>
   <div class="interim-box" id="interimBox"></div>
 </div>
 
@@ -84,12 +84,9 @@
   let isRunning = false;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  // 混雑回避のため高速なLiteモデルを優先し、失敗時は別モデルへ自動切替
   const MODELS = [
     "gemini-3.8-flash-lite",
-    "gemini-3.8-flash",
-    "gemini-flash-lite-latest",
-    "gemini-flash-latest"
+    "gemini-3.8-flash"
   ];
 
   window.onload = () => {
@@ -155,11 +152,11 @@
       return;
     }
 
-    const [fromCode, fromName] = document.getElementById("langFrom").value.split("|");
-    const [, toName] = document.getElementById("langTo").value.split("|");
+    const [fromSpeech, fromIso, fromName] = document.getElementById("langFrom").value.split("|");
+    const [, toIso, toName] = document.getElementById("langTo").value.split("|");
 
     recognition = new SpeechRecognition();
-    recognition.lang = fromCode;
+    recognition.lang = fromSpeech;
     recognition.interimResults = true;
     recognition.continuous = true;
 
@@ -180,7 +177,7 @@
         if (event.results[i].isFinal) {
           interimBox.style.display = "none";
           interimBox.textContent = "";
-          createAndTranslateCard(transcript.trim(), fromName, toName, apiKey);
+          createAndTranslateCard(transcript.trim(), fromIso, toIso, fromName, toName, apiKey);
         } else {
           interimTranscript += transcript;
         }
@@ -230,42 +227,64 @@
     }
   }
 
-  async function fetchTranslationWithFallback(originalText, fromName, toName, apiKey) {
-    let lastError = "";
+  // 4秒で強制タイムアウトするfetchラッパー（iOS Safariのハング防止）
+  async function fetchWithTimeout(url, options, timeoutMs = 4000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(id);
+      return response;
+    } catch (err) {
+      clearTimeout(id);
+      throw err;
+    }
+  }
+
+  async function translateText(originalText, fromIso, toIso, fromName, toName, apiKey) {
+    // 1. まずGeminiの超高速モデル（思考オフ設定）で試行
     for (let i = 0; i < MODELS.length; i++) {
       const model = MODELS[i];
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: `以下の${fromName}の音声認識テキストを、文脈を補って自然な${toName}に翻訳してください。翻訳結果のみを出力し、解説や記号は一切不要です。\n\nテキスト: ${originalText}`
-              }]
-            }],
-            generationConfig: { temperature: 0.2 }
-          })
-        });
+        const res = await fetchWithTimeout(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: `Translate the following ${fromName} text into natural ${toName}. Output ONLY the translated text.\n\n${originalText}`
+                }]
+              }],
+              generationConfig: {
+                temperature: 0.1,
+                thinkingConfig: { thinkingBudget: 0 }
+              }
+            })
+          },
+          3500
+        );
         const data = await res.json();
-        if (data.error) {
-          lastError = data.error.message;
-          // 混雑(503)や制限(429)や非対応モデルの場合は次のモデルへ即座にフォールバック
-          await new Promise(r => setTimeout(r, 300));
-          continue;
-        }
         const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (result) return result;
-      } catch (err) {
-        lastError = err.message;
-        // SafariのLoad failed等は少し待って次のモデル/リトライへ
-        await new Promise(r => setTimeout(r, 400));
+      } catch (e) {
+        // タイムアウトや混雑時は即座に次へ
       }
     }
-    throw new Error(lastError || "翻訳に失敗しました");
+
+    // 2. Geminiが混雑・タイムアウトした場合は、無料の高速翻訳APIへ自動フォールバック
+    const fallbackUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(originalText)}&langpair=${fromIso}|${toIso}`;
+    const fbRes = await fetchWithTimeout(fallbackUrl, { method: "GET" }, 4000);
+    const fbData = await fbRes.json();
+    if (fbData.responseData?.translatedText) {
+      return fbData.responseData.translatedText;
+    }
+
+    throw new Error("すべての翻訳サーバーが応答しませんでした");
   }
 
-  async function createAndTranslateCard(originalText, fromName, toName, apiKey) {
+  async function createAndTranslateCard(originalText, fromIso, toIso, fromName, toName, apiKey) {
     if (!originalText) return;
     const box = document.getElementById("logBox");
     const interimBox = document.getElementById("interimBox");
@@ -287,10 +306,10 @@
     box.scrollTop = box.scrollHeight;
 
     try {
-      const result = await fetchTranslationWithFallback(originalText, fromName, toName, apiKey);
+      const result = await translateText(originalText, fromIso, toIso, fromName, toName, apiKey);
       transDiv.textContent = result;
     } catch (err) {
-      transDiv.textContent = "再試行後もエラー: " + err.message;
+      transDiv.textContent = "エラー: " + err.message;
     }
     box.scrollTop = box.scrollHeight;
   }
